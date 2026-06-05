@@ -43,6 +43,11 @@ typedef struct {
     size_t node_count;   /* Total number of successfully parsed nodes */
 } TomlParser;
 
+typedef struct {
+    size_t found_pos;
+    int found;
+} SimdResult;
+
 /**
  * Main entry point for the TOML parser pipeline.
  * Parses the source buffer and populates the flat node array.
