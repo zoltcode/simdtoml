@@ -1,76 +1,102 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "simdtoml.h"
 
+/* Helper to convert timespec struct into fractional milliseconds */
+static inline double get_elapsed_ms(struct timespec start, struct timespec end) {
+    return (double)(end.tv_sec - start.tv_sec) * 1000.0 +
+    (double)(end.tv_nsec - start.tv_nsec) / 1000000.0;
+}
+
 int main() {
-    /*
-     * Complex TOML string payload for verification.
-     * Contains tables, strings, numeric primitives, booleans, and comments.
-     */
-    const char *toml_data =
-    "# Global Configuration Metadata Component\n"
-    "[owner]\n"
-    "name = \"Tom Preston-Werner\"\n"
-    "id = 9942                  # Inline comment example\n"
-    "active = true\n\n"
-    "[database]\n"
-    "server = \"192.168.1.1\"\n"
-    "ports = 8001\n"
-    "connections = 128";
+    const char *filename = "large_benchmark.toml";
 
-    size_t len = strlen(toml_data);
-
-    /*
-     * Pre-allocate Flat AST sequence memory blocks upfront.
-     * Memory requirements scale linear to content footprint size.
-     */
-    TomlNode *nodes_array = malloc(sizeof(TomlNode) * len);
-    if (!nodes_array) {
-        fprintf(stderr, "Fatal: Flat AST node memory allocation failed\n");
+    /* Open and inspect file descriptor blocks */
+    FILE *f = fopen(filename, "rb");
+    if (!f) {
+        fprintf(stderr, "Fatal Error: Cannot open file '%s'. Run the terminal generation script first.\n", filename);
         return -1;
     }
 
-    /* Initialize runtime parsing pipeline wrapper */
-    TomlParser parser = {
-        .src = toml_data,
-        .pos = 0,
-        .length = len,
-        .nodes = nodes_array,
-        .node_count = 0
-    };
+    /* Calculate total payload memory footprint size bytes */
+    fseek(f, 0, SEEK_END);
+    size_t file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
 
-    /* Execute the parser algorithm engine */
-    toml_parse(&parser);
+    /* Allocate buffer and stream binary contents directly into RAM */
+    char *file_buffer = malloc(file_size + 1);
+    if (!file_buffer) {
+        fclose(f);
+        return -1;
+    }
+    size_t read_bytes = fread(file_buffer, 1, file_size, f);
+    file_buffer[read_bytes] = '\0';
+    fclose(f);
 
-    /* Process compiled flat node metadata block sequence logs */
-    printf("=== SIMDTOML SCALAR ENGINE VALIDATION REPORT ===\n");
-    printf("Total successfully extracted nodes: %zu\n", parser.node_count);
+    printf("=== SIMDTOML PERFORMANCE BENCHMARK ENGINE ===\n");
+    printf("Loaded target file: %s (%zu bytes / %.2f MB)\n\n",
+           filename, file_size, (double)file_size / (1024.0 * 1024.0));
 
-    for (size_t i = 0; i < parser.node_count; i++) {
-        TomlNode n = parser.nodes[i];
-
-        if (n.type == TOML_NODE_TABLE) {
-            printf("\n[Table Header] Target: %.*s\n", (int)n.key.len, n.key.ptr);
-        }
-        else if (n.type == TOML_NODE_KEY_VALUE) {
-            /*
-             * Safety fallback fallback display check.
-             * If pointer is empty, map output value tag to literal string token identifier.
-             */
-            if (n.val.ptr != NULL) {
-                printf("  [Property Map] Key: %-12.*s -> Value: %.*s\n",
-                       (int)n.key.len, n.key.ptr, (int)n.val.len, n.val.ptr);
-            } else {
-                printf("  [Property Map] Key: %-12.*s -> Value: [EMPTY / NULL]\n",
-                       (int)n.key.len, n.key.ptr);
-            }
-        }
+    /* Pre-allocate Flat AST sequence token slots block metadata sequence array once */
+    TomlNode *nodes_array = malloc(sizeof(TomlNode) * file_size);
+    if (!nodes_array) {
+        free(file_buffer);
+        return -1;
     }
 
-    printf("\n=== VALIDATION RECOVERY COMPLETED ===\n");
+    /*
+     * Iterations block run sequence loops.
+     * We execute the full pipeline multiple times to warm up CPU cache pipelines
+     * and get an accurate average speed reading.
+     */
+    const int iterations = 100;
+    size_t total_nodes_extracted = 0;
 
-    /* Free heap resources */
+    struct timespec start_time, end_time;
+
+    /* Benchmark Start Point Anchor */
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+    for (int i = 0; i < iterations; i++) {
+        /* Reset parser context constraints variables on every loop sequence step */
+        TomlParser parser = {
+            .src = file_buffer,
+            .pos = 0,
+            .length = file_size,
+            .nodes = nodes_array,
+            .node_count = 0
+        };
+
+        toml_parse(&parser);
+        total_nodes_extracted = parser.node_count; /* Retain for validation telemetry */
+    }
+
+    /* Benchmark End Point Anchor */
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+
+    /* Metric math summaries computation analytics */
+    double total_ms = get_elapsed_ms(start_time, end_time);
+    double avg_ms = total_ms / (double)iterations;
+
+    /* Throughput capacity math conversion: Bytes processed per unit of time */
+    double processed_gb = ((double)file_size * (double)iterations) / (1024.0 * 1024.0 * 1024.0);
+    double duration_seconds = total_ms / 1000.0;
+    double throughput_gb_s = processed_gb / duration_seconds;
+
+    /* Telemetry Report Terminal Log Output */
+    printf("Benchmark Profile Analytics Metrics Completed:\n");
+    printf("--------------------------------------------------\n");
+    printf("Total iterations run         : %d\n", iterations);
+    printf("Extracted nodes per run      : %zu\n", total_nodes_extracted);
+    printf("Average execution latency    : %.4f ms\n", avg_ms);
+    printf("Total cumulative process time: %.2f ms\n", total_ms);
+    printf("Calculated raw processing speed: **%.3f GB/s**\n", throughput_gb_s);
+    printf("--------------------------------------------------\n");
+
+    /* Cleanup all operational context components */
     free(nodes_array);
+    free(file_buffer);
     return 0;
 }
